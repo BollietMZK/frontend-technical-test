@@ -1,3 +1,4 @@
+import { UserEntity } from './models/entities/user';
 import { Meme } from './models/meme';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
@@ -44,11 +45,7 @@ export async function login(username: string, password: string): Promise<LoginRe
   }).then((res) => checkStatus(res).json());
 }
 
-export type GetUserByIdResponse = {
-  id: string;
-  username: string;
-  pictureUrl: string;
-};
+export type GetUserByIdResponse = UserEntity;
 
 /**
  * Get a user by their id
@@ -58,6 +55,22 @@ export type GetUserByIdResponse = {
  */
 export async function getUserById(token: string, id: string): Promise<GetUserByIdResponse> {
   return await fetch(`${BASE_URL}/users/${id}`, {
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  }).then((res) => checkStatus(res).json());
+}
+
+/**
+ * Get a list of users by their ids
+ * @param token
+ * @param id
+ * @returns
+ */
+export async function getUsers(token: string, ids: string[]): Promise<UserEntity[]> {
+  const qsIds = ids.map((id) => `ids=${id}`).join('&');
+  return await fetch(`${BASE_URL}/users?${qsIds}`, {
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,

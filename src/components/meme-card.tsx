@@ -8,7 +8,7 @@ import { useState } from 'react';
 
 export type MemeCardProps = {
   id: string;
-  author: {
+  author?: {
     username: string;
     pictureUrl: string;
   };
@@ -38,7 +38,7 @@ export const MemeCard: React.FC<MemeCardProps> = ({ id, author, createdAt, comme
   return (
     <VStack key={id} p={4} width="full" align="stretch">
       <Flex justifyContent="space-between" alignItems="center">
-        <MemeAuthor username={author.username} photoUrl={author.pictureUrl} />
+        {author && <MemeAuthor username={author.username} photoUrl={author.pictureUrl} />}
         <Text fontStyle="italic" color="gray.500" fontSize="small">
           {format(createdAt)}
         </Text>

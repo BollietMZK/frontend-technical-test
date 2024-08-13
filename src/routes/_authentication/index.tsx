@@ -1,64 +1,64 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Flex, StackDivider, VStack } from '@chakra-ui/react';
-import {
-  // createMemeComment,
-  // getMemeComments, GetMemeCommentsResponse,
-  getMemes,
-  GetMemesResponse,
-  getUserById,
-  // GetUserByIdResponse
-} from '../../api';
+import { getMemes, getUsers } from '../../api';
 import { useAuthToken } from '../../contexts/authentication';
 import { Loader } from '../../components/loader';
-// import { MemePicture } from '../../components/meme-picture';
-// import { useState } from 'react';
-// import { jwtDecode } from 'jwt-decode';
 import { MemeCard } from '../../components/meme-card';
+import { useMemo } from 'react';
+import { UserEntity } from '../../models/entities/user';
+
+interface FetchMemesParams {
+  queryKey: [name: string, token: string, page: number];
+}
+
+const fetchMemes = async (params: FetchMemesParams) => {
+  const [, token, page] = params.queryKey;
+  const response = await getMemes(token, page);
+  return response.results;
+};
+
+interface FetchAuthorsParams {
+  queryKey: [name: string, token: string, authorIds: string[] | undefined];
+}
+
+const fetchAuthors = async (params: FetchAuthorsParams) => {
+  const [, token, authorIds] = params.queryKey;
+  const uniqueAuthorIds = [...new Set(authorIds)];
+  const response = await getUsers(token, uniqueAuthorIds);
+  return response;
+};
+
+const mapUserById = (map: Record<string, UserEntity>, author: UserEntity): Record<string, UserEntity> => {
+  map[author.id] = author;
+  return map;
+};
 
 export const MemeFeedPage: React.FC = () => {
+  // authentication
   const token = useAuthToken();
+
+  // memes
   const { isLoading, data: memes } = useQuery({
-    queryKey: ['memes'],
-    queryFn: async () => {
-      const memes: GetMemesResponse['results'] = [];
-      const firstPage = await getMemes(token, 1);
-      memes.push(...firstPage.results);
-
-      // const remainingPages = Math.ceil(firstPage.total / firstPage.pageSize) - 1;
-      // for (let i = 0; i < remainingPages; i++) {
-      //   const page = await getMemes(token, i + 2);
-      //   memes.push(...page.results);
-      // }
-
-      const memesWithAuthorAndComments = [];
-      for (const meme of memes) {
-        const author = await getUserById(token, meme.authorId);
-        // const comments: GetMemeCommentsResponse['results'] = [];
-        // const firstPage = await getMemeComments(token, meme.id, 1);
-        // comments.push(...firstPage.results);
-        // const remainingCommentPages = Math.ceil(firstPage.total / firstPage.pageSize) - 1;
-        // for (let i = 0; i < remainingCommentPages; i++) {
-        //   const page = await getMemeComments(token, meme.id, i + 2);
-        //   comments.push(...page.results);
-        // }
-        // const commentsWithAuthor: (GetMemeCommentsResponse['results'][0] & {
-        //   author: GetUserByIdResponse;
-        // })[] = [];
-        // for (const comment of comments) {
-        //   const author = await getUserById(token, comment.authorId);
-        //   commentsWithAuthor.push({ ...comment, author });
-        // }
-        memesWithAuthorAndComments.push({
-          ...meme,
-          author,
-          // comments: commentsWithAuthor,
-        });
-      }
-
-      return memesWithAuthorAndComments;
-    },
+    queryKey: ['memes', token, 1],
+    queryFn: fetchMemes,
   });
+
+  // authorIds memoization
+  const authorIds = useMemo(() => memes?.map((meme) => meme.authorId), [memes]);
+
+  // authors
+  const { data: authors } = useQuery({
+    queryKey: ['authors', token, authorIds],
+    queryFn: fetchAuthors,
+    enabled: !!authorIds && authorIds.length > 0,
+  });
+
+  // memoized map of authors by their id
+  const authorsMap = useMemo(() => {
+    const emptyValue: Record<string, UserEntity> = {};
+    return authors?.reduce(mapUserById, emptyValue) || emptyValue;
+  }, [authors]);
 
   if (isLoading) {
     return <Loader data-testid="meme-feed-loader" />;
@@ -67,7 +67,18 @@ export const MemeFeedPage: React.FC = () => {
   return (
     <Flex width="full" height="full" justifyContent="center" overflowY="auto">
       <VStack p={4} width="full" maxWidth={800} divider={<StackDivider border="gray.200" />}>
-        {memes?.map((meme) => <MemeCard key={meme.id} {...meme} />)}
+        {memes?.map((meme) => (
+          <MemeCard
+            key={meme.id}
+            id={meme.id}
+            author={authorsMap[meme.authorId]}
+            pictureUrl={meme.pictureUrl}
+            description={meme.description}
+            commentsCount={meme.commentsCount}
+            texts={meme.texts}
+            createdAt={meme.createdAt}
+          />
+        ))}
       </VStack>
     </Flex>
   );
