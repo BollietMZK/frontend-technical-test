@@ -92,9 +92,13 @@ export const MemeFeedPage: React.FC = () => {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (isFetchingNextPage) return;
+    if (isFetchingNextPage) {
+      return;
+    }
 
-    if (observerRef.current) observerRef.current.disconnect();
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
 
     observerRef.current = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasNextPage) {
@@ -102,10 +106,14 @@ export const MemeFeedPage: React.FC = () => {
       }
     });
 
-    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
+    if (sentinelRef.current) {
+      observerRef.current.observe(sentinelRef.current);
+    }
 
     return () => {
-      if (observerRef.current) observerRef.current.disconnect();
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
     };
   }, [fetchNextPage, isFetchingNextPage, hasNextPage]);
 
