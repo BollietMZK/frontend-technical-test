@@ -1,21 +1,22 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { Flex, StackDivider, VStack } from '@chakra-ui/react';
+import { Button, Flex, StackDivider, VStack } from '@chakra-ui/react';
 import { getMemes, getUsers } from '../../api';
 import { useAuthToken } from '../../contexts/authentication';
 import { Loader } from '../../components/loader';
 import { MemeCard } from '../../components/meme-card';
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { UserEntity } from '../../models/entities/user';
 
 interface FetchMemesParams {
-  queryKey: [name: string, token: string, page: number];
+  queryKey: string[];
+  pageParam: number;
 }
 
 const fetchMemes = async (params: FetchMemesParams) => {
-  const [, token, page] = params.queryKey;
-  const response = await getMemes(token, page);
-  return response.results;
+  const [, token] = params.queryKey;
+  const response = await getMemes(token, params.pageParam);
+  return response;
 };
 
 interface FetchAuthorsParams {
@@ -38,14 +39,40 @@ export const MemeFeedPage: React.FC = () => {
   // authentication
   const token = useAuthToken();
 
+  // Set to store already fetched author IDs
+  const [fetchedAuthorIds, setFetchedAuthorIds] = useState<Set<string>>(new Set());
+
   // memes
-  const { isLoading, data: memes } = useQuery({
-    queryKey: ['memes', token, 1],
+  const {
+    isLoading,
+    data: memePages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['memes', token],
     queryFn: fetchMemes,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _pages, lastPageParam) => (lastPage.results.length > 0 ? lastPageParam + 1 : undefined),
   });
 
-  // authorIds memoization
-  const authorIds = useMemo(() => memes?.map((meme) => meme.authorId), [memes]);
+  const memes = useMemo(() => memePages?.pages?.flatMap((page) => page.results) || [], [memePages]);
+
+  // Filter out authorIds that have already been fetched
+  const authorIds = useMemo(() => {
+    return memes.map((meme) => meme.authorId).filter((id) => !fetchedAuthorIds.has(id));
+  }, [memes, fetchedAuthorIds]);
+
+  // Update the fetchedAuthorIds set after authors are fetched
+  useEffect(() => {
+    if (authorIds.length > 0) {
+      setFetchedAuthorIds((prev) => {
+        const updatedSet = new Set(prev);
+        authorIds.forEach((id) => updatedSet.add(id));
+        return updatedSet;
+      });
+    }
+  }, [authorIds]);
 
   // authors
   const { data: authors } = useQuery({
@@ -79,6 +106,11 @@ export const MemeFeedPage: React.FC = () => {
             createdAt={meme.createdAt}
           />
         ))}
+        {hasNextPage && (
+          <Button onClick={() => fetchNextPage()} isLoading={isFetchingNextPage}>
+            Charger plus
+          </Button>
+        )}
       </VStack>
     </Flex>
   );

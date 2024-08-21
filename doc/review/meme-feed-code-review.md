@@ -20,3 +20,7 @@ Il faut charger uniquement ce dont on a besoin à un instant T :
 ### Au démarrage
 
 Seule la page 1 est chargée. On récupère les auteurs des mèmes de cette page. Pour éviter de faire des calculs inutiles, on utilise les mécanismes de React (useMemo)
+
+## Ce qui n'a pas été fait
+
+- Gestion d'erreurs
