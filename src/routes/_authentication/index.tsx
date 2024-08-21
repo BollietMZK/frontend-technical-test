@@ -1,11 +1,11 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { Button, Flex, StackDivider, VStack } from '@chakra-ui/react';
+import { Box, Flex, StackDivider, VStack } from '@chakra-ui/react';
 import { getMemes, getUsers } from '../../api';
 import { useAuthToken } from '../../contexts/authentication';
 import { Loader } from '../../components/loader';
 import { MemeCard } from '../../components/meme-card';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { UserEntity } from '../../models/entities/user';
 
 interface FetchMemesParams {
@@ -39,7 +39,7 @@ export const MemeFeedPage: React.FC = () => {
   // authentication
   const token = useAuthToken();
 
-  // Set to store already fetched author IDs
+  // set to store already fetched author IDs
   const [fetchedAuthorIds, setFetchedAuthorIds] = useState<Set<string>>(new Set());
 
   // memes
@@ -58,12 +58,12 @@ export const MemeFeedPage: React.FC = () => {
 
   const memes = useMemo(() => memePages?.pages?.flatMap((page) => page.results) || [], [memePages]);
 
-  // Filter out authorIds that have already been fetched
+  // filter out authorIds that have already been fetched
   const authorIds = useMemo(() => {
     return memes.map((meme) => meme.authorId).filter((id) => !fetchedAuthorIds.has(id));
   }, [memes, fetchedAuthorIds]);
 
-  // Update the fetchedAuthorIds set after authors are fetched
+  // update the fetchedAuthorIds set after authors are fetched
   useEffect(() => {
     if (authorIds.length > 0) {
       setFetchedAuthorIds((prev) => {
@@ -87,6 +87,28 @@ export const MemeFeedPage: React.FC = () => {
     return authors?.reduce(mapUserById, emptyValue) || emptyValue;
   }, [authors]);
 
+  // infinite scrolling
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (isFetchingNextPage) return;
+
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasNextPage) {
+        fetchNextPage();
+      }
+    });
+
+    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
+
+    return () => {
+      if (observerRef.current) observerRef.current.disconnect();
+    };
+  }, [fetchNextPage, isFetchingNextPage, hasNextPage]);
+
   if (isLoading) {
     return <Loader data-testid="meme-feed-loader" />;
   }
@@ -107,9 +129,9 @@ export const MemeFeedPage: React.FC = () => {
           />
         ))}
         {hasNextPage && (
-          <Button onClick={() => fetchNextPage()} isLoading={isFetchingNextPage}>
-            Charger plus
-          </Button>
+          <Box ref={sentinelRef}>
+            <Loader data-testid="meme-feed-loader" />
+          </Box>
         )}
       </VStack>
     </Flex>
